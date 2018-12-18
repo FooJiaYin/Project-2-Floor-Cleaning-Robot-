@@ -93,7 +93,10 @@ int main (int argc, char* argv[]) {
         while(total_zero) {
             if(Battery<=minStep[now.x][now.y] || (Battery<max_Battery*0.75 && (map[now.x][now.y-1]=='R'||map[now.x][now.y+1]=='R'||map[now.x-1][now.y]=='R'||map[now.x+1][now.y]=='R'))) 
                 charge(map, 1, minStep);
-            if(isolated(map, now.x, now.y)); 
+            if(isolated(map, now.x, now.y+1)) now.y++;
+            else if(isolated(map, now.x+1, now.y)) now.x++;
+            else if(isolated(map, now.x, now.y-1)) now.y--;
+            else if(isolated(map, now.x-1, now.y)) now.x--;
             else if(map[now.x][now.y+1]=='0') now.y++;
             else if(map[now.x+1][now.y]=='0') now.x++;
             else if(map[now.x][now.y-1]=='0') now.y--;
@@ -128,36 +131,14 @@ Point pt(int x, int y)
 }
 
 bool isolated(char** map, int x, int y) {
-    int count[4] = {0};
-    for(int i=0; i<4; i++){
-        switch(i){
-            case 0: y++; break;
-            case 1: y-=2; break;
-            case 2: y++, x--; break;
-            case 3: x+=2; break;
-        }
-        if(x>=0 && y>=0 && x<max_row && y<max_col && map[x][y]=='0') {
-            if(y==max_col-1 || map[x][y+1]!='0') count[i]++;
-            if(y==0 || map[x][y-1]!='0') count[i]++;
-            if(x==max_row-1 || map[x+1][y]!='0') count[i]++;
-            if(x==0 || map[x-1][y]!='0') count[i]++;
-            //cout << count[i] << endl;
-            if(count[i]==4) {
-                now.x = x, now.y = y;
-                return true;
-            }
-        }
-    }
-    for(int i=0; i<4; i++) {
-        if(count[i]==3) {
-            switch(i){
-                case 0: now.y++; break;
-                case 1: now.y--; break;
-                case 2: now.x++; break;
-                case 3: now.x--; break;
-            }
-            return true;
-        }
+    if(map[x][y]=='0') {
+        int count = 0;
+        if(map[x][y+1]!='0') count++;
+        if(map[x][y-1]!='0') count++;
+        if(map[x+1][y]!='0') count++;
+        if(map[x-1][y]!='0') count++;
+        //cout << count << endl;
+        if(count>2) return true;
     }
     return false;
 }
