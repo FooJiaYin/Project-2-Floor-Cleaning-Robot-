@@ -32,7 +32,6 @@ void print(char**);
 void countSteps(Point start, char** map, int** minStep, bool init);
 void charge(char** map, int back, int** minStep);
 void findNext(char**, int**);
-bool isolated(char** map, int x, int y);
 
 int main (int argc, char* argv[]) {
     string dir = argv[1], dir_in, dir_out;
@@ -93,11 +92,7 @@ int main (int argc, char* argv[]) {
         while(total_zero) {
             if(Battery<=minStep[now.x][now.y] || (Battery<max_Battery*0.75 && (map[now.x][now.y-1]=='R'||map[now.x][now.y+1]=='R'||map[now.x-1][now.y]=='R'||map[now.x+1][now.y]=='R'))) 
                 charge(map, 1, minStep);
-            if(isolated(map, now.x, now.y+1)) now.y++;
-            else if(isolated(map, now.x+1, now.y)) now.x++;
-            else if(isolated(map, now.x, now.y-1)) now.y--;
-            else if(isolated(map, now.x-1, now.y)) now.x--;
-            else if(map[now.x][now.y+1]=='0') now.y++;
+            if(map[now.x][now.y+1]=='0') now.y++;
             else if(map[now.x+1][now.y]=='0') now.x++;
             else if(map[now.x][now.y-1]=='0') now.y--;
             else if(map[now.x-1][now.y]=='0') now.x--;
@@ -130,24 +125,11 @@ Point pt(int x, int y)
 	return p;
 }
 
-bool isolated(char** map, int x, int y) {
-    if(map[x][y]=='0') {
-        int count = 0;
-        if(map[x][y+1]!='0') count++;
-        if(map[x][y-1]!='0') count++;
-        if(map[x+1][y]!='0') count++;
-        if(map[x-1][y]!='0') count++;
-        //cout << count << endl;
-        if(count>2) return true;
-    }
-    return false;
-}
-
 bool check(int i, int j, unsigned int steps, Point *queue, char** map, int** minStep)
 {
     //cout << i << ' ' << j << endl;
     if(i>0 && j>0 && i<max_row && j<max_col && !minStep[i][j] && (i!=queue[0].x || j!=queue[0].y)) {
-        if(map[i][j]=='1'||map[i][j]=='R') minStep[i][j] = -1;
+        if(map[i][j]=='1') minStep[i][j] = -1;
         else {
             minStep[i][j] = steps;
             queue[current].x = i;
@@ -311,7 +293,6 @@ void countSteps(Point start, char** map, int** minStep, bool init) {
 void charge(char** map, int back, int** minStep) {
     unsigned step = minStep[now.x][now.y];
     Point pathToCharge[step+1];
-    int direction;
     while(minStep[now.x][now.y]) {
         //pathToCharge[minStep[now.x][now.y]].x = now.x;
         //pathToCharge[minStep[now.x][now.y]].y = now.y;
@@ -319,23 +300,15 @@ void charge(char** map, int back, int** minStep) {
         else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1 && map[now.x][now.y+1]=='0') now.y++;
         else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1 && map[now.x-1][now.y]=='0') now.x--;
         else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1 && map[now.x+1][now.y]=='0') now.x++;
-        else if(minStep[now.x][now.y-1]==minStep[now.x][now.y]-1) now.y--, direction = 0;
-        else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1) now.y++, direction = 1;
-        else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1) now.x--, direction = 2;
-        else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1) now.x++, direction = 3;
+        else if(minStep[now.x][now.y-1]==minStep[now.x][now.y]-1) now.y--;
+        else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1) now.y++;
+        else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1) now.x--;
+        else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1) now.x++;
         if(map[now.x][now.y] == '0') map[now.x][now.y] = '2';
         print(map);
     }
     Battery = max_Battery;
     if(back) {
-        //cout << now.x << ' ' << now.y << ' ' << direction << endl;
-        switch(direction) {
-            case 0: now.y++; break;
-            case 1: now.y--; break;
-            case 2: now.x++; break;
-            case 3: now.x--; break;
-        }
-        print(map);
         /*for(int i=1; i<=step; i++) {
             now.x = pathToCharge[i].x;
             now.y = pathToCharge[i].y;
