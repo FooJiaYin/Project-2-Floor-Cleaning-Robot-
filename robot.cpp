@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <stack>
 //#include "stdafx.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -25,74 +26,88 @@ Point pt(int, int);
 Point now;
 Point endd;
 vector<Point> path;
-int** minStep;
-void visit(int**, Point);
+void visit(char**, Point, int**);
 //int visit(int**, Point, Point);
-void print(int**);
-void countSteps(Point *queue, int** map);
-void charge(int** map, int back);
+void print(char**);
+void countSteps(Point start, char** map, int** minStep, bool init);
+void charge(char** map, int back, int** minStep);
+void findNext(char**, int**);
+bool isolated(char** map, int x, int y);
 
 int main (int argc, char* argv[]) {
     string dir = argv[1], dir_in, dir_out;
     dir_in = "test_case/" + dir + "/floor.data";
     dir_out = "test_case/" + dir + "/final.path";
-    //dir_count = "test_case/" + dir + "/stepCount.txt";
+    string dir_count = "test_case/" + dir + "/stepCount.txt";
     ifstream input(dir_in);
     ofstream output(dir_out);
     //ofstream stepCount(dir_count);
 
     if(input.is_open() && output.is_open()) {
         input >> max_row >> max_col >> max_Battery;
-        char temp;
         Point start;
+
         /* Read the map */
-        minStep = new int*[max_row];
-        int** map = new int*[max_row];
+        int** minStep = new int*[max_row];
+        char** map = new char*[max_row];
         for(int i=0; i<max_row; i++) {
             minStep[i] = new int[max_col];
-            map[i] = new int[max_col];
+            map[i] = new char[max_col];
             for(int j=0; j<max_col; j++) {
                 do {
-                    input >> temp;
-                } while(temp==' '|| temp=='\n');
-                if(temp=='R') {
+                    input >> map[i][j];
+                } while(map[i][j]==' '|| map[i][j]=='\n');
+                if(map[i][j]=='R') {
                     start.x = i;
                     start.y = j;
-                    map[i][j] = 1;
                 }
-                else if(temp=='0') map[i][j] = 0;
-                else if(temp=='1') map[i][j] = 1;
+                else if(map[i][j]=='0') total_zero++;
                 minStep[i][j] = 0;
             }
         }
-        /*for(int i=0; i<max_row; i++) {
+        /*cout << start.x << ' ' << start.y << endl;
+        for(int i=0; i<max_row; i++) {
             for(int j=0; j<max_col-1; j++) {
                 output << map[i][j] << ' ';
             }
             output << map[i][max_col-1] << endl;
         }*/
-        Point* queue = new Point[max_row*max_col];
+        
         Battery = max_Battery;
-        cout << start.x << ' ' << start.y << endl;
-        queue[0].x = start.x;
-        queue[0].y = start.y;
         minStep[start.x][start.y] = -1;
-        cout << start.x << ' ' << start.y << ' ' << minStep[start.x][start.y] << endl;
-        countSteps(queue, map);
-        //output << max_step;
-        minStep[start.x][start.y] = 0;
-        map[start.x][start.y] = 0;
-
+        countSteps(start, map, minStep, 1);
         /*for (int i = 0; i < max_row; i++) {
             for (int j = 0; j < max_col; j++) {
                 output << setw(4) << minStep[i][j];
             }
             output << endl;
-        }*/
-        cout << "pt" << start.x << ' ' << start.y << ' ' << map[start.x][start.y] << endl;
-        visit(map, pt(start.x, start.y));
-        now.x = endd.x, now.y = endd.y;
-        charge(map, 0);
+        }
+        output << max_step;*/
+        minStep[start.x][start.y] = 0;
+        map[start.x][start.y] = 0;
+        //visit(map, pt(start.x, start.y), minStep);
+        //now.x = endd.x, now.y = endd.y;
+
+        now.x = start.x, now.y = start.y;
+        print(map);
+        while(total_zero) {
+            if(Battery<=minStep[now.x][now.y] || (Battery<max_Battery*0.75 && (map[now.x][now.y-1]=='R'||map[now.x][now.y+1]=='R'||map[now.x-1][now.y]=='R'||map[now.x+1][now.y]=='R'))) 
+                charge(map, 1, minStep);
+            if(isolated(map, now.x, now.y)); 
+            else if(map[now.x][now.y+1]=='0') now.y++;
+            else if(map[now.x+1][now.y]=='0') now.x++;
+            else if(map[now.x][now.y-1]=='0') now.y--;
+            else if(map[now.x-1][now.y]=='0') now.x--;
+            else {
+                findNext(map, minStep);
+                continue;
+            }
+            map[start.x][start.y] = 'R';
+            map[now.x][now.y] = '2';
+            print(map);
+        }
+
+        charge(map, 0, minStep);
         output << path.size() << endl;
         for(auto pt : path) output << pt.x << ' ' << pt.y << endl;
 
@@ -102,7 +117,7 @@ int main (int argc, char* argv[]) {
 
     else if(!input.is_open()) cout << "Unable to open testcase" << endl;
     else cout << "Unable to open output" << endl;
-    system("Pause");
+    //system("Pause");
     return 0;
 }
 
@@ -112,107 +127,267 @@ Point pt(int x, int y)
 	return p;
 }
 
-void visit(int** map, Point start)
+bool isolated(char** map, int x, int y) {
+    int count[4] = {0};
+    for(int i=0; i<4; i++){
+        switch(i){
+            case 0: y++; break;
+            case 1: y-=2; break;
+            case 2: y++, x--; break;
+            case 3: x+=2; break;
+        }
+        if(x>=0 && y>=0 && x<max_row && y<max_col && map[x][y]=='0') {
+            if(y==max_col-1 || map[x][y+1]!='0') count[i]++;
+            if(y==0 || map[x][y-1]!='0') count[i]++;
+            if(x==max_row-1 || map[x+1][y]!='0') count[i]++;
+            if(x==0 || map[x-1][y]!='0') count[i]++;
+            //cout << count[i] << endl;
+            if(count[i]==4) {
+                now.x = x, now.y = y;
+                return true;
+            }
+        }
+    }
+    for(int i=0; i<4; i++) {
+        if(count[i]==3) {
+            switch(i){
+                case 0: now.y++; break;
+                case 1: now.y--; break;
+                case 2: now.x++; break;
+                case 3: now.x--; break;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool check(int i, int j, unsigned int steps, Point *queue, char** map, int** minStep)
+{
+    //cout << i << ' ' << j << endl;
+    if(i>0 && j>0 && i<max_row && j<max_col && !minStep[i][j] && (i!=queue[0].x || j!=queue[0].y)) {
+        if(map[i][j]=='1'||map[i][j]=='R') minStep[i][j] = -1;
+        else {
+            minStep[i][j] = steps;
+            queue[current].x = i;
+            queue[current].y = j;
+            if(map[i][j]=='0') return true;
+            current++;
+        }
+    }
+    return false;
+}
+
+Point *constructPath(int** minStep, Point p) {
+    Point *pathTo0 = new Point[minStep[p.x][p.y]+1];
+    while(minStep[p.x][p.y]) {
+        pathTo0[minStep[p.x][p.y]].x = p.x;
+        pathTo0[minStep[p.x][p.y]].y = p.y;
+        if(minStep[p.x][p.y-1]==minStep[p.x][p.y]-1) p.y--;
+        else if(minStep[p.x][p.y+1]==minStep[p.x][p.y]-1) p.y++;
+        else if(minStep[p.x-1][p.y]==minStep[p.x][p.y]-1) p.x--;
+        else if(minStep[p.x+1][p.y]==minStep[p.x][p.y]-1) p.x++;
+    }
+    return pathTo0;
+}
+
+void findNext(char** map, int** minStep) {
+    current = 1;
+    Point* queue = new Point[max_row*max_col];
+    int** miniStep = new int*[max_row];
+    for(int i=0; i<max_row; i++) {
+        miniStep[i] = new int[max_col];
+        for(int j=0; j<max_col; j++) 
+            miniStep[i][j] = 0;
+    }
+    queue[0].x = now.x;
+    queue[0].y = now.y;
+    unsigned int read = 0, endd = 0, steps = 0;
+    bool found = false;
+    for(steps=1; current!=endd && !found; ++steps){
+        endd = current;
+        for(; read<endd && !found; read++) {
+            if(check(queue[read].x+1, queue[read].y, steps, queue, map, miniStep)) found = true;
+            else if(check(queue[read].x-1, queue[read].y, steps, queue, map, miniStep)) found = true;
+            else if(check(queue[read].x, queue[read].y+1, steps, queue, map, miniStep)) found = true;
+            else if(check(queue[read].x, queue[read].y-1, steps, queue, map, miniStep)) found = true;
+        }
+        if(Battery<steps) {         
+            delete[] queue;
+            delete[] miniStep;
+            charge(map, 1, minStep);
+            return;
+        }
+    } 
+	//system("CLS");
+    /*for (int i = 0; i < max_row; i++)
+	{
+		for (int j = 0; j < max_col; j++) {
+            if(i==now.x && j==now.y) printf("0 ");
+            //else if(map[i][j]=='0') total_zero++;
+            else switch (map[i][j])
+            {
+            case '0': total_zero++; printf("* "); break;
+            case '1': printf("X "); break;
+            case '2': printf("  "); break;
+            case 'R': printf("R "); break;
+            }
+        }
+		printf("\n");
+	}
+    for (int i = 0; i < max_row; i++) {
+        for (int j = 0; j < max_col; j++) {
+            cout << setw(2) << miniStep[i][j];
+        }
+        cout << endl;
+    }
+    cout << "now: " << now.x << " " << now.y << endl;
+    cout << "next: " << queue[current].x << " " << queue[current].y << endl;*/
+    if(Battery < steps + minStep[queue[current].x][queue[current].y]) {         
+        delete[] queue;
+        delete[] miniStep;
+        charge(map, 1, minStep);
+        return;
+    }
+    int totalStep = miniStep[queue[current].x][queue[current].y];
+    Point *pathTo0 = constructPath(miniStep, queue[current]);
+
+    for(int i=1; i<=totalStep; i++) {
+        now.x = pathTo0[i].x;
+        now.y = pathTo0[i].y;
+        map[now.x][now.y] = '2';
+        print(map);
+        //cout << now.x << ' ' << now.y << endl;
+    }
+    delete[] queue;
+    delete[] miniStep;
+}
+
+void visit(char** map, Point start, int** minStep)
 {
     //cout << total_zero << endl;
-	if (!map[start.x][start.y])
+	if (map[start.x][start.y]=='0')
 	{
-		map[start.x][start.y] = 2;
+		map[start.x][start.y] = '2';
         now.x = start.x;
         now.y = start.y;
 		if(total_zero) {
             print(map); 
             if(Battery<=minStep[start.x][start.y]) 
-                charge(map, 1);
-            visit(map, pt(start.x, start.y + 1));
-            visit(map, pt(start.x + 1, start.y));
-            visit(map, pt(start.x, start.y - 1));
-            visit(map, pt(start.x - 1, start.y));
+                charge(map, 1, minStep);
+            visit(map, pt(start.x, start.y + 1), minStep);
+            visit(map, pt(start.x + 1, start.y), minStep);
+            visit(map, pt(start.x, start.y - 1), minStep);
+            visit(map, pt(start.x - 1, start.y), minStep);
             now.x = start.x;
             now.y = start.y;
             if(total_zero) print(map); 
             if(Battery<=minStep[start.x][start.y]) 
-                charge(map, 1);
+                charge(map, 1, minStep);
             //else charge(map);
         }
 	}
 	return;
 }
 
-void check(int i, int j, unsigned int steps, Point *queue, int** map)
+void mark(int i, int j, unsigned int steps, Point *queue, char** map, int** minStep)
 {
     //cout << i << ' ' << j << endl;
-    if(i>0 && j>0 && i<max_row && j<max_col && !map[i][j] && !minStep[i][j]) {
+    if(i>0 && j>0 && i<max_row && j<max_col && map[i][j]=='0' && !minStep[i][j]) {
         minStep[i][j] = steps;
         queue[current].x = i;
         queue[current].y = j;
         current++;
     }
-    else if(map[i][j]) minStep[i][j] = -1;
+    else if(map[i][j]=='1') minStep[i][j] = -1;
 }
 
-void countSteps(Point *queue, int** map) {
+void countSteps(Point start, char** map, int** minStep, bool init) {
+    Point* queue = new Point[max_row*max_col];
+    queue[0].x = start.x;
+    queue[0].y = start.y;
     unsigned long read = 0, endd = 0, steps = 0;
     for(steps=1; current!=endd; ++steps){
         endd = current;
         for(; read<endd; read++) {
             //cout << read << endl;
-            check(queue[read].x+1, queue[read].y, steps, queue, map);
-            check(queue[read].x-1, queue[read].y, steps, queue, map);
-            check(queue[read].x, queue[read].y+1, steps, queue, map);
-            check(queue[read].x, queue[read].y-1, steps, queue, map);
+            mark(queue[read].x+1, queue[read].y, steps, queue, map, minStep);
+            mark(queue[read].x-1, queue[read].y, steps, queue, map, minStep);
+            mark(queue[read].x, queue[read].y+1, steps, queue, map, minStep);
+            mark(queue[read].x, queue[read].y-1, steps, queue, map, minStep);
         }
     }
-    cout << steps;
     max_step = steps;
+    delete[] queue;
+    /*for (int i = 0; i < max_row; i++) {
+        for (int j = 0; j < max_col; j++) {
+            output << setw(4) << minStep[i][j];
+        }
+        output << endl;
+    }*/
 }
 
-void charge(int** map, int back) {
+void charge(char** map, int back, int** minStep) {
     unsigned step = minStep[now.x][now.y];
     Point pathToCharge[step+1];
+    int direction;
     while(minStep[now.x][now.y]) {
-        pathToCharge[minStep[now.x][now.y]].x = now.x;
-        pathToCharge[minStep[now.x][now.y]].y = now.y;
-        if(minStep[now.x][now.y-1]==minStep[now.x][now.y]-1) now.y--;
-        else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1) now.y++;
-        else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1) now.x--;
-        else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1) now.x++;
-        map[now.x][now.y] = 2;
+        //pathToCharge[minStep[now.x][now.y]].x = now.x;
+        //pathToCharge[minStep[now.x][now.y]].y = now.y;
+        if(minStep[now.x][now.y-1]==minStep[now.x][now.y]-1 && map[now.x][now.y-1]=='0') now.y--;
+        else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1 && map[now.x][now.y+1]=='0') now.y++;
+        else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1 && map[now.x-1][now.y]=='0') now.x--;
+        else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1 && map[now.x+1][now.y]=='0') now.x++;
+        else if(minStep[now.x][now.y-1]==minStep[now.x][now.y]-1) now.y--, direction = 0;
+        else if(minStep[now.x][now.y+1]==minStep[now.x][now.y]-1) now.y++, direction = 1;
+        else if(minStep[now.x-1][now.y]==minStep[now.x][now.y]-1) now.x--, direction = 2;
+        else if(minStep[now.x+1][now.y]==minStep[now.x][now.y]-1) now.x++, direction = 3;
+        if(map[now.x][now.y] == '0') map[now.x][now.y] = '2';
         print(map);
     }
     Battery = max_Battery;
     if(back) {
-        for(int i=1; i<=step; i++) {
+        //cout << now.x << ' ' << now.y << ' ' << direction << endl;
+        switch(direction) {
+            case 0: now.y++; break;
+            case 1: now.y--; break;
+            case 2: now.x++; break;
+            case 3: now.x--; break;
+        }
+        print(map);
+        /*for(int i=1; i<=step; i++) {
             now.x = pathToCharge[i].x;
             now.y = pathToCharge[i].y;
             print(map);
-        }
+        }*/
+        findNext(map, minStep);
     }
 }
 
-void print(int** map) {
+void print(char** map) {
 	int i, j;
     total_zero = 0;
-	//system("CLS");
-	//printf("Battery=%d\n", Battery);
+	/*system("CLS");
+	printf("Battery=%d\n", Battery);*/
     Battery--;
 	for (i = 0; i < max_row; i++)
 	{
 		for (j = 0; j < max_col; j++) {
             if(i==now.x && j==now.y) ;//printf("0 ");
-            else if(map[i][j]==0) total_zero++;
+            else if(map[i][j]=='0') total_zero++;
             /*else switch (map[i][j])
             {
-            case 0: total_zero++; printf("* "); break;
-            case 1: printf("X "); break;
-            case 2: printf("  "); break;
+                case '0': total_zero++; printf("* "); break;
+                case '1': printf("X "); break;
+                case '2': printf("  "); break;
+                case 'R': printf("R "); break;
             }*/
         }
 		//printf("\n");
 	}
     if(total_zero==0) endd.x = now.x,  endd.y = now.y;
     //printf("%u\n", total_zero);
-    //cout << "pt" <<' ' << now.x << ' ' << now.y << endl;
+    //cout << "pt" <<' ' << now.x << ' ' << now.y << " Battery:" << Battery << endl;
     path.push_back(pt(now.x, now.y));
 	//Sleep(0.01);
     return;
